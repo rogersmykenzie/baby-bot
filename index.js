@@ -10,27 +10,30 @@ const client = new Discord.Client();
 //command prefix
 const prefix = `!`;
 //controller functions
-const {help, checkNumCorrections, addCorrection} = require("./controllers/commandController");
+const {help, addCorrection, getCorrectionStatus} = require("./controllers/commandController");
 const {insultLuis} = require("./controllers/baseController");
 //constants
 const { GENERAL_CHAT_ID } = process.env;
 const GOOD_USERS = ["lol5p00n", "señorwolfy69", "Faenor", "BabyBot"];
 let DB;
+let corrections;
 //global functions
-function getCorrections() {
-
+async function getCorrections() {
+    corrections = await DB.getCorrections()
+    console.log(corrections);
 }
 
 massive(process.env.CONNECTION_STRING).then(db => {
     DB = db;
     console.log("Database Connected");
+    getCorrections();
 })
 
 let numLuisMessagesInLastMinute = 0;
 let timesPlayedRPS = 0;
 setInterval(() => {
     numLuisMessagesInLastMinute = 0;
-    if(Math.random() < .02) {
+    if(Math.random() < .01) {
         let hours = +moment().format("HH");
         for(let i = 0; i < hours; i++) {
             if(i % 2 === 0) {
@@ -55,7 +58,11 @@ client.on('message', message => {
     //initalize baby-speak
     message.weply = message.reply;
     //luis
-
+    corrections.forEach(val => {
+        if(message.content.toLowerCase().includes(val.flag.toLowerCase()) && message.author.username !== "BabyBot") {
+            message.weply(`Excuse me, don't you mean \"${val.correction}\"`)
+        }
+    })
 
     if(numLuisMessagesInLastMinute >= 10 && GOOD_USERS.includes(message.author.username) === false) {
         insultLuis(message)
@@ -74,12 +81,29 @@ client.on('message', message => {
     if(message.content.startsWith("!")) {
         let command = message.content.substring(1);
         let args = command.split(" ");
-        console.log(args);
         switch(args[0].toUpperCase().trim()) {
             //set correction command
             case "SETCORRECTION":
+                if(message.content.includes("--status")) {
+                    getCorrectionStatus(DB).then(response => {
+                        let reply = response.map(val => {
+                            return `${val.id} | ${val.flag} | ${val.correction} | ${val.username}`
+                        })
+                        if(reply.length <= 0) {
+                            message.reply("No cowections cuwentwy exist");
+                            return;
+                        }
+                        reply.unshift("ID | FLAG | CORRECTION | USERNAME");
+                        reply.unshift("\n");
+                        reply.join("\n");
+                        message.reply(reply);
+                    })
+                    break;
+                }
                 if(args[1] !== undefined && args[2] !== undefined) {
-                    addCorrection(message, DB, args[1], args[2], message.author.username);
+                    addCorrection(message, DB, args[1], args.slice(2).join(" "), message.author.username).then(() => {
+                        getCorrections();
+                    })
                 } else {
                     message.weply("I think you meant to say something else :/")
                 }
