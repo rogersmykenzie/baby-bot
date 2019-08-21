@@ -3,17 +3,28 @@ require("dotenv").config();
 //imports
 const axios = require("axios");
 const moment = require("moment");
+const massive = require("massive");
 //bot setup
 const Discord = require('discord.js');
 const client = new Discord.Client();
 //command prefix
 const prefix = `!`;
 //controller functions
-const {help} = require("./controllers/commandController");
+const {help, checkNumCorrections, addCorrection} = require("./controllers/commandController");
 const {insultLuis} = require("./controllers/baseController");
 //constants
 const { GENERAL_CHAT_ID } = process.env;
 const GOOD_USERS = ["lol5p00n", "señorwolfy69", "Faenor", "BabyBot"];
+let DB;
+//global functions
+function getCorrections() {
+
+}
+
+massive(process.env.CONNECTION_STRING).then(db => {
+    DB = db;
+    console.log("Database Connected");
+})
 
 let numLuisMessagesInLastMinute = 0;
 let timesPlayedRPS = 0;
@@ -28,7 +39,7 @@ setInterval(() => {
                 client.channels.get(GENERAL_CHAT_ID).send("Ga");
             }
         }
-        client.channels.get(GENERAL_CHAT_ID).send(`It is ${+moment().format("LT").split(" ")[0]} o-cwock`);
+        client.channels.get(GENERAL_CHAT_ID).send(`It is ${moment().format("LT").split(" ")[0]} o-cwock`);
     }
 }, 1000 * 60)
 
@@ -65,9 +76,15 @@ client.on('message', message => {
         let args = command.split(" ");
         console.log(args);
         switch(args[0].toUpperCase().trim()) {
+            //set correction command
             case "SETCORRECTION":
-                
+                if(args[1] !== undefined && args[2] !== undefined) {
+                    addCorrection(message, DB, args[1], args[2], message.author.username);
+                } else {
+                    message.weply("I think you meant to say something else :/")
+                }
                 break;
+            //login command
             case "LOGIN":
                 message.weply("LOGIN");
                 break;
@@ -118,7 +135,11 @@ client.on('message', message => {
 
 
 
-console.log("Initializing Baby Bot");
+console.log("Initializing Baby Bot...");
 client.login(process.env.DISCORD_TOKEN).then(response => {
-    console.log("Baby Bot Initialized");
+    console.log("...Baby Bot Initialized");
 });
+
+module.exports = {
+    getCorrections
+}
